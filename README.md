@@ -10,16 +10,16 @@ Planned features:
         3. ETA
         4. Importance
         5. Custom Weight
-    2. Sort list by (default):
+    2. Sort list by (default): (Done with linked list)(TODO: Change data structure for easier sorting.)
         1. Effective Deadline (Deadline - ETA)
         2. Importance
         3. Custom Weight
     3. Basic Printing of the list. (Done)
-    4. Read/Write list to a file. (Read done)
-2. Create a simple interactive prompt for this application.
+    4. Read/Write list to a file. (Done)
+2. Create a simple interactive prompt for this application. (TODO)
 3. Change to-do list sort parameter.
 4. Query for most important task atm.
-5. Generate image filling the screen based on task importance.
-6. Integrate a timer to track time spent.
+5. GUI
+6. Generate image filling the screen based on task importance.
 7. Graph time statistics.
-8. GUI
+8. Integrate a timer to track time spent.
