@@ -1,5 +1,6 @@
 // main file of the checlist project.
 
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -38,38 +39,48 @@ struct ChecklistItem *stringToTask(char *str) {
 	return temp;
 }
 
-//char *taskToString(struct ChecklistItem* task) {
-//	char *temp = malloc(sizeof(char)*50);
-//
-//}
+char *taskToString(struct ChecklistItem *task) {
+	char *temp = malloc(sizeof(char) * LINE_LIMIT);
+	snprintf(temp, LINE_LIMIT, "%s,%d,%d,%d,%d\n", task->name, task->deadline, task->eta, task->priority, task->custom);
+	return temp;
+}
 
-struct ListNode *readCSV() {
+void freeItem(struct ChecklistItem **task) {
+	free((*task)->name);
+	free(*task);
+	task = NULL;
+}
 
-    FILE *fp = fopen("tasks.csv", "r");
+void readCSV(char *fpath) {
+
+    FILE *fp = fopen(fpath, "r");
     if (fp == NULL) {
-        printf("Error opening tasks.csv.");
-        return NULL;
-    } 
+        fprintf(stderr, "Error opening %s to read: %s\n", fpath, strerror(errno));
+        return;
+    }
 
     char *buf = malloc(sizeof(char) * LINE_LIMIT);
 	fgets(buf, LINE_LIMIT, fp);
 	
 	if (strcmp(buf, CSV_HEADER)) {
-		printf("tasks.csv has the wrong header. Please check formatting.\n");
-		printf("Exiting readCSV()\n");
-		return NULL;
+		printf("%s has the wrong header. Please check formatting.\n", fpath);
+		printf("Aborting read file.\n");
+		free(buf);
+		fclose(fp);
+		return;
 	}
 
 	struct ListNode *cur;
-	struct ListNode *ret; // keep pointer to head ListNode to return;
 
 	if (strcmp(fgets(buf, LINE_LIMIT, fp), "\n")) {
 		cur = (struct ListNode *) malloc(sizeof(struct ListNode *));
-		ret = cur;
+		head = cur;
 		cur->item = stringToTask(buf);
 	} else {
-		printf("tasks.csv contains no tasks.\n");
-		return NULL;
+		printf("%s contains no tasks.\n", fpath);
+		free(buf);
+		fclose(fp);
+		return;
 	}
 	
 	while (strcmp(fgets(buf, LINE_LIMIT, fp), "\n")) {
@@ -79,7 +90,37 @@ struct ListNode *readCSV() {
 	}
 
 	free(buf);
-	return ret;
+	fclose(fp);
+}
+
+void writeCSV(char *fpath) {
+	if (head == NULL) {
+		printf("Loaded list is empty.\n");
+		return;
+	}
+
+	FILE *fp = fopen(fpath, "w+");
+	if (fp == NULL) {
+		fprintf(stderr, "Error opening %s to write: %s\n", fpath, strerror(errno));
+		return;
+	}
+
+	fprintf(fp, "%s", CSV_HEADER);
+
+	char *buf;
+	struct ListNode *cur = head;
+
+	while(1) {
+		buf = taskToString(cur->item);
+		fprintf(fp, "%s", buf);
+		free(buf);
+		buf = NULL;
+		if (cur->next == NULL) {
+			break;
+		}
+		cur = cur->next;
+	}
+	fclose(fp);
 }
 
 void printItem(struct ChecklistItem* pItem) {
@@ -87,10 +128,10 @@ void printItem(struct ChecklistItem* pItem) {
 }
 
 void printList() {
-	
+	if (DEBUG) {printf("Printing list.\n");}
+
 	if (head->item == NULL) {
 		printf("The List is Empty.\n");
-		printf("head.item = %p\n", head->item);
 		return;
 	}
 	
@@ -104,16 +145,44 @@ void printList() {
 	}
 }
 
+void terminate() {
+	
+	if (DEBUG) {printf("Terminating program (freeing heap mem.)\n");}
+	
+	if (head == NULL) {
+		if (DEBUG) {printf("List is empty. Terminating.\n");}
+		return;
+	}
+	
+	struct ListNode *prev;
+	struct ListNode *cur = head;
+	
+	while(cur->next != NULL) {
+		prev = cur;
+		cur = cur->next;
+		freeItem(&(prev->item));
+		free(prev);
+		prev = NULL;
+	}
+
+	freeItem(&(cur->item));
+	free(cur);
+	cur = NULL;
+	
+}
+
 int main(int argc, char **argv) {
     
 	printf("Reading CSV.\n");
-    head = readCSV();
+	readCSV("tasks.csv");
 
 	printf("Printing current list.\n");
     printList();
 
+	printf("Writing list to file.\n");
+	writeCSV("tasksout.csv");
 
-
+	terminate();
 
     return 0;
 
