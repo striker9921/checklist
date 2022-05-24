@@ -9,6 +9,7 @@
 const char DEBUG = 0;
 const char *CSV_HEADER = "Task Name,Deadline,ETA,Priority,Custom Weight\n";
 const int LINE_LIMIT = 50;
+const int TASK_LIMIT = 10;
 
 struct ChecklistItem {
     char *name;
@@ -17,6 +18,8 @@ struct ChecklistItem {
     int priority;
     int custom;
 };
+
+ChecklistItem *list;
 
 struct ListNode {
     struct ChecklistItem *item;
@@ -172,6 +175,8 @@ void terminate() {
 }
 
 int main(int argc, char **argv) {
+
+	list = malloc(sizeof(ChecklistItem) * LIST_LIMIT);
     
 	printf("Reading CSV.\n");
 	readCSV("tasks.csv");
