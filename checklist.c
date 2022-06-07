@@ -5,11 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 
-
 const char DEBUG = 0;
 const char *CSV_HEADER = "Task Name,Deadline,ETA,Priority,Custom Weight\n";
 const int LINE_LIMIT = 50;
-const int TASK_LIMIT = 10;
+const int TASKS_PER_PAGE = 10;
 
 struct ChecklistItem {
     char *name;
@@ -19,14 +18,7 @@ struct ChecklistItem {
     int custom;
 };
 
-ChecklistItem *list;
-
-struct ListNode {
-    struct ChecklistItem *item;
-    struct ListNode *next;
-};
-
-struct ListNode *head;
+struct ChecklistItem **list;
 
 struct ChecklistItem *stringToTask(char *str) {
 
@@ -73,23 +65,12 @@ void readCSV(char *fpath) {
 		return;
 	}
 
-	struct ListNode *cur;
-
-	if (strcmp(fgets(buf, LINE_LIMIT, fp), "\n")) {
-		cur = (struct ListNode *) malloc(sizeof(struct ListNode *));
-		head = cur;
-		cur->item = stringToTask(buf);
-	} else {
-		printf("%s contains no tasks.\n", fpath);
-		free(buf);
-		fclose(fp);
-		return;
-	}
-	
-	while (strcmp(fgets(buf, LINE_LIMIT, fp), "\n")) {
-		cur->next = (struct ListNode *) malloc(sizeof(struct ListNode *));
-		cur = cur->next;
-		cur->item = stringToTask(buf);
+	for (int i = 0; i < TASKS_PER_PAGE; i++) {
+		if (strcmp(fgets(buf, LINE_LIMIT, fp), "\n")) {
+			list[i] = stringToTask(buf);
+		} else {
+			break;
+		}
 	}
 
 	free(buf);
@@ -97,7 +78,7 @@ void readCSV(char *fpath) {
 }
 
 void writeCSV(char *fpath) {
-	if (head == NULL) {
+	if (list == NULL) {
 		printf("Loaded list is empty.\n");
 		return;
 	}
@@ -111,19 +92,12 @@ void writeCSV(char *fpath) {
 	fprintf(fp, "%s", CSV_HEADER);
 
 	char *buf;
-	struct ListNode *cur = head;
 
-	while(1) {
-		buf = taskToString(cur->item);
+	for (int i = 0; i < TASKS_PER_PAGE; i++) {
+		buf = taskToString(list[i]);
 		fprintf(fp, "%s", buf);
 		free(buf);
-		buf = NULL;
-		if (cur->next == NULL) {
-			break;
-		}
-		cur = cur->next;
 	}
-	fclose(fp);
 }
 
 void printItem(struct ChecklistItem* pItem) {
@@ -133,63 +107,72 @@ void printItem(struct ChecklistItem* pItem) {
 void printList() {
 	if (DEBUG) {printf("Printing list.\n");}
 
-	if (head->item == NULL) {
+	if (list == NULL) {
 		printf("The List is Empty.\n");
 		return;
 	}
 	
 	printf("%s", CSV_HEADER);	
 	
-	struct ListNode *cur = head;
-	printItem(cur->item);
-	while (cur->next != NULL) {
-		cur = cur->next;
-		printItem(cur->item);
+	for (int i = 0; i < TASKS_PER_PAGE; i++) {
+		printf("%s\t|%d\t|%d\t|%d\t|%d\t|", list[i]->name, list[i]->deadline, list[i]->eta, list[i]->priority, list[i]->custom);
 	}
+
 }
 
 void terminate() {
 	
 	if (DEBUG) {printf("Terminating program (freeing heap mem.)\n");}
 	
-	if (head == NULL) {
+	if (list == NULL) {
 		if (DEBUG) {printf("List is empty. Terminating.\n");}
 		return;
 	}
 	
-	struct ListNode *prev;
-	struct ListNode *cur = head;
-	
-	while(cur->next != NULL) {
-		prev = cur;
-		cur = cur->next;
-		freeItem(&(prev->item));
-		free(prev);
-		prev = NULL;
+	for (int i = 0; i < TASKS_PER_PAGE; i++) {
+		freeItem(&list[i]);
 	}
+}
 
-	freeItem(&(cur->item));
-	free(cur);
-	cur = NULL;
-	
+void setupList() {
+	list = malloc(sizeof(struct ChecklistItem) * TASKS_PER_PAGE);
+	readCSV("tasksin.csv");
+	writeCSV("tasksout.csv");
+
+}
+
+void input(char *buffer, int max) {
+	fgets(buffer, max, stdin);
+	buffer[strcspn(buffer, "\n")] = 0;
 }
 
 int main(int argc, char **argv) {
 
-	list = malloc(sizeof(ChecklistItem) * LIST_LIMIT);
-    
-	printf("Reading CSV.\n");
-	readCSV("tasks.csv");
+	int running = 1;
+	char *buffer = malloc(sizeof(char) * 50);
+	while (running) {
+		printf("Enter a command (print/read/write/quit): ");
+		input(buffer, 49);
+		if (!strcmp(buffer, "print")) {
+			printList();
+		} else if (!strcmp(buffer, "read")) {
+			printf("Enter a file to read from: ");
+			input(buffer, 49);
+			readCSV(buffer);
+		} else if (!strcmp(buffer, "write")) {
+			printf("Enter a file to save to: ");
+			input(buffer, 49);
+			writeCSV(buffer);
+		} else if (!strcmp(buffer, "quit")) {
+			printf("Ending program.\n");
+			running = 0;
+		} else {
+			printf("Invalid command.\n");
+		}
+	}
 
-	printf("Printing current list.\n");
-    printList();
-
-	printf("Writing list to file.\n");
-	writeCSV("tasksout.csv");
-
+	free(buffer);
 	terminate();
-
     return 0;
-
 }
 
