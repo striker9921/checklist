@@ -4,10 +4,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 const char DEBUG = 0;
+const char *prefix = "[DEBUG]";
 const char *CSV_HEADER = "Task Name,Deadline,ETA,Priority,Custom Weight\n";
-const int LINE_LIMIT = 50;
+const int LINE_LIMIT = 255;
 const int TASKS_PER_PAGE = 10;
 
 struct ChecklistItem {
@@ -20,17 +22,40 @@ struct ChecklistItem {
 
 struct ChecklistItem **list;
 
-struct ChecklistItem *stringToTask(char *str) {
+void dp(char *format, ...) {
+	if (DEBUG) {
+		printf("[DEBUG]");
+		va_list args;
+		va_start (args, format);
+		vprintf (format, args);
+		va_end (args);
+	}
+}
 
-	printf("Parsing string: %s\n", str);
+int str_eq(const char *str1, const char *str2) {
+	return !strcmp(str1, str2);
+}
+
+void printItem(struct ChecklistItem* pItem) {
+	printf("|%s\t|%d\t|%d\t|%d\t|%d\t|\n", pItem->name, pItem->deadline, pItem->eta, pItem->priority, pItem->custom);
+}
+
+struct ChecklistItem *stringToTask(char *str) {
+	dp("Parsing string: %s", str);
 
 	struct ChecklistItem *temp = malloc(sizeof(struct ChecklistItem));
+	char *ptr = str;
+
 	temp->name = malloc(sizeof(char) * (LINE_LIMIT-22));
 	strcpy(temp->name, strtok(str, ","));
-	temp->deadline = atoi(strtok(NULL, ","));
-	temp->eta = atoi(strtok(NULL, ","));
-	temp->priority = atoi(strtok(NULL, ","));
-	temp->custom = atoi(strtok(NULL, ","));
+	ptr += strlen(temp->name) + 1;
+	temp->deadline = (int) strtol(ptr, &ptr, 10);
+	ptr++;
+	temp->eta = (int) strtol(ptr, &ptr, 10);
+	ptr++;
+	temp->priority = (int) strtol(ptr, &ptr, 10);
+	ptr++;
+	temp->custom = (int) strtol(ptr, &ptr, 10);
 	return temp;
 }
 
@@ -56,21 +81,22 @@ void readCSV(char *fpath) {
 
     char *buf = malloc(sizeof(char) * LINE_LIMIT);
 	fgets(buf, LINE_LIMIT, fp);
-	
-	if (strcmp(buf, CSV_HEADER)) {
+
+	if (!str_eq(buf, CSV_HEADER)) {
 		printf("%s has the wrong header. Please check formatting.\n", fpath);
-		printf("Aborting read file.\n");
+		printf("Ending read file.\n");
 		free(buf);
 		fclose(fp);
 		return;
 	}
-
+	
 	for (int i = 0; i < TASKS_PER_PAGE; i++) {
-		if (strcmp(fgets(buf, LINE_LIMIT, fp), "\n")) {
-			list[i] = stringToTask(buf);
-		} else {
+		fgets(buf, LINE_LIMIT, fp);
+		if (feof(fp)) {
 			break;
 		}
+
+		list[i] = stringToTask(buf);
 	}
 
 	free(buf);
@@ -85,11 +111,12 @@ void writeCSV(char *fpath) {
 
 	FILE *fp = fopen(fpath, "w+");
 	if (fp == NULL) {
-		fprintf(stderr, "Error opening %s to write: %s\n", fpath, strerror(errno));
+		fprintf(stderr, "Error opening %s to write: %s", fpath, strerror(errno));
 		return;
 	}
 
-	fprintf(fp, "%s", CSV_HEADER);
+	fprintf(fp, "%s\n", CSV_HEADER);
+
 
 	char *buf;
 
@@ -100,12 +127,8 @@ void writeCSV(char *fpath) {
 	}
 }
 
-void printItem(struct ChecklistItem* pItem) {
-	printf("|%s\t|%d\t|%d\t|%d\t|%d\t|\n", pItem->name, pItem->deadline, pItem->eta, pItem->priority, pItem->custom);
-}
-
 void printList() {
-	if (DEBUG) {printf("Printing list.\n");}
+	dp("Printing list.\n");
 
 	if (list == NULL) {
 		printf("The List is Empty.\n");
@@ -115,17 +138,20 @@ void printList() {
 	printf("%s", CSV_HEADER);	
 	
 	for (int i = 0; i < TASKS_PER_PAGE; i++) {
-		printf("%s\t|%d\t|%d\t|%d\t|%d\t|", list[i]->name, list[i]->deadline, list[i]->eta, list[i]->priority, list[i]->custom);
+		if (list[i] == NULL) {
+			break;
+		}
+		printItem(list[i]);
 	}
 
 }
 
 void terminate() {
 	
-	if (DEBUG) {printf("Terminating program (freeing heap mem.)\n");}
+	dp("Terminating program (freeing heap mem.)\n");
 	
 	if (list == NULL) {
-		if (DEBUG) {printf("List is empty. Terminating.\n");}
+		dp("List is empty. Terminating.\n");
 		return;
 	}
 	
@@ -134,36 +160,32 @@ void terminate() {
 	}
 }
 
-void setupList() {
-	list = malloc(sizeof(struct ChecklistItem) * TASKS_PER_PAGE);
-	readCSV("tasksin.csv");
-	writeCSV("tasksout.csv");
-
-}
-
 void input(char *buffer, int max) {
 	fgets(buffer, max, stdin);
 	buffer[strcspn(buffer, "\n")] = 0;
 }
 
+
+
 int main(int argc, char **argv) {
 
 	int running = 1;
-	char *buffer = malloc(sizeof(char) * 50);
+	char *buffer = malloc(sizeof(char) * LINE_LIMIT);
+	list = malloc(sizeof(struct ChecklistItem) * TASKS_PER_PAGE);
 	while (running) {
 		printf("Enter a command (print/read/write/quit): ");
-		input(buffer, 49);
-		if (!strcmp(buffer, "print")) {
+		input(buffer, LINE_LIMIT);
+		if (str_eq(buffer, "print")) {
 			printList();
-		} else if (!strcmp(buffer, "read")) {
+		} else if (str_eq(buffer, "read")) {
 			printf("Enter a file to read from: ");
 			input(buffer, 49);
 			readCSV(buffer);
-		} else if (!strcmp(buffer, "write")) {
+		} else if (str_eq(buffer, "write")) {
 			printf("Enter a file to save to: ");
 			input(buffer, 49);
 			writeCSV(buffer);
-		} else if (!strcmp(buffer, "quit")) {
+		} else if (str_eq(buffer, "quit")) {
 			printf("Ending program.\n");
 			running = 0;
 		} else {
