@@ -6,7 +6,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-const char DEBUG = 0;
 const char *prefix = "[DEBUG]";
 const char *CSV_HEADER = "Task Name,Deadline,ETA,Priority,Custom Weight\n";
 const int LINE_LIMIT = 255;
@@ -22,8 +21,16 @@ struct ChecklistItem {
 
 struct ChecklistItem **list;
 
-void dp(char *format, ...) {
-	if (DEBUG) {
+enum LOG_LEVEL {
+	LOG,
+	DEBUG,
+	ERROR
+};
+
+int logging[3] = {0, 0, 0};
+
+void logp(enum LOG_LEVEL log, char *format, ...) {
+	if (logging[(int) log]) {
 		printf("[DEBUG]");
 		va_list args;
 		va_start (args, format);
@@ -41,7 +48,7 @@ void printItem(struct ChecklistItem* pItem) {
 }
 
 struct ChecklistItem *stringToTask(char *str) {
-	dp("Parsing string: %s", str);
+	logp(DEBUG, "Parsing string: %s", str);
 
 	struct ChecklistItem *temp = malloc(sizeof(struct ChecklistItem));
 	char *ptr = str;
@@ -128,7 +135,6 @@ void writeCSV(char *fpath) {
 }
 
 void printList() {
-	dp("Printing list.\n");
 
 	if (list == NULL) {
 		printf("The List is Empty.\n");
@@ -138,20 +144,20 @@ void printList() {
 	printf("%s", CSV_HEADER);	
 	
 	for (int i = 0; i < TASKS_PER_PAGE; i++) {
-		if (list[i] == NULL) {
-			break;
-		}
-		printItem(list[i]);
+		if (list[i] != NULL) {
+			printf("|%02d.", i);
+			printItem(list[i]);
+		} else {break;}
 	}
 
 }
 
 void terminate() {
 	
-	dp("Terminating program (freeing heap mem.)\n");
+	logp(DEBUG, "Terminating program (freeing heap mem.)\n");
 	
 	if (list == NULL) {
-		dp("List is empty. Terminating.\n");
+		logp(DEBUG ,"List is empty. Terminating.\n");
 		return;
 	}
 	
@@ -171,7 +177,7 @@ int main(int argc, char **argv) {
 
 	int running = 1;
 	char *buffer = malloc(sizeof(char) * LINE_LIMIT);
-	list = malloc(sizeof(struct ChecklistItem) * TASKS_PER_PAGE);
+	list = calloc(TASKS_PER_PAGE, sizeof(struct ChecklistItem*));
 	while (running) {
 		printf("Enter a command (print/read/write/quit): ");
 		input(buffer, LINE_LIMIT);
