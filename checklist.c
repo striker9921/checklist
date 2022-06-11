@@ -11,6 +11,16 @@ const char *CSV_HEADER = "Task Name,Deadline,ETA,Priority,Custom Weight\n";
 const int LINE_LIMIT = 255;
 const int TASKS_PER_PAGE = 10;
 
+enum LOG_LEVEL {
+	LOG,
+	DEBUG,
+	ERROR
+};
+
+const int LOGGING[3] = {0, 0, 0};
+const char LOG_FORMAT[3][9] = {"[ LOG ] ", "[DEBUG] ", "[ERROR] "};
+
+
 struct ChecklistItem {
     char *name;
     int deadline;
@@ -21,17 +31,9 @@ struct ChecklistItem {
 
 struct ChecklistItem **list;
 
-enum LOG_LEVEL {
-	LOG,
-	DEBUG,
-	ERROR
-};
-
-int logging[3] = {0, 0, 0};
-
 void logp(enum LOG_LEVEL log, char *format, ...) {
-	if (logging[(int) log]) {
-		printf("[DEBUG]");
+	if (LOGGING[(int) log]) {
+		printf(LOG_FORMAT[(int) log]);
 		va_list args;
 		va_start (args, format);
 		vprintf (format, args);
@@ -48,7 +50,7 @@ void printItem(struct ChecklistItem* pItem) {
 }
 
 struct ChecklistItem *stringToTask(char *str) {
-	logp(DEBUG, "Parsing string: %s", str);
+	logp(LOG, "Parsing string: %s", str);
 
 	struct ChecklistItem *temp = malloc(sizeof(struct ChecklistItem));
 	char *ptr = str;
@@ -79,10 +81,11 @@ void freeItem(struct ChecklistItem **task) {
 }
 
 void readCSV(char *fpath) {
+	logp(LOG, "Reading from file: %s\n", fpath);
 
     FILE *fp = fopen(fpath, "r");
     if (fp == NULL) {
-        fprintf(stderr, "Error opening %s to read: %s\n", fpath, strerror(errno));
+        logp(ERROR, "Error opening %s to read: %s\n", fpath, strerror(errno));
         return;
     }
 
@@ -97,41 +100,54 @@ void readCSV(char *fpath) {
 		return;
 	}
 	
+	int count = 0;
 	for (int i = 0; i < TASKS_PER_PAGE; i++) {
 		fgets(buf, LINE_LIMIT, fp);
 		if (feof(fp)) {
 			break;
 		}
-
+		count++;
 		list[i] = stringToTask(buf);
 	}
+	logp(LOG, "Read %d tasks into list.\n", count);
 
 	free(buf);
 	fclose(fp);
 }
 
 void writeCSV(char *fpath) {
+	logp(LOG, "Writing tasks in list to file: %s\n", fpath);
+
 	if (list == NULL) {
+		printf("List is not loaded.\n");
+		return;
+	}
+
+	if (list[0] == NULL) {
 		printf("Loaded list is empty.\n");
 		return;
 	}
 
-	FILE *fp = fopen(fpath, "w+");
+	FILE *fp = fopen(fpath, "w");
 	if (fp == NULL) {
-		fprintf(stderr, "Error opening %s to write: %s", fpath, strerror(errno));
+		logp(ERROR, "Error opening %s to write: %s", fpath, strerror(errno));
 		return;
 	}
 
-	fprintf(fp, "%s\n", CSV_HEADER);
-
+	fprintf(fp, "%s", CSV_HEADER);
 
 	char *buf;
 
 	for (int i = 0; i < TASKS_PER_PAGE; i++) {
+		if (list[i] == NULL) {
+			fclose(fp);
+			break;
+		}
 		buf = taskToString(list[i]);
 		fprintf(fp, "%s", buf);
 		free(buf);
 	}
+	fclose(fp);
 }
 
 void printList() {
@@ -154,10 +170,10 @@ void printList() {
 
 void terminate() {
 	
-	logp(DEBUG, "Terminating program (freeing heap mem.)\n");
+	logp(LOG, "Terminating program (freeing heap mem.)\n");
 	
 	if (list == NULL) {
-		logp(DEBUG ,"List is empty. Terminating.\n");
+		logp(LOG ,"List is empty. Terminating.\n");
 		return;
 	}
 	
@@ -185,11 +201,11 @@ int main(int argc, char **argv) {
 			printList();
 		} else if (str_eq(buffer, "read")) {
 			printf("Enter a file to read from: ");
-			input(buffer, 49);
+			input(buffer, LINE_LIMIT);
 			readCSV(buffer);
 		} else if (str_eq(buffer, "write")) {
 			printf("Enter a file to save to: ");
-			input(buffer, 49);
+			input(buffer, LINE_LIMIT);
 			writeCSV(buffer);
 		} else if (str_eq(buffer, "quit")) {
 			printf("Ending program.\n");
@@ -203,4 +219,3 @@ int main(int argc, char **argv) {
 	terminate();
     return 0;
 }
-
